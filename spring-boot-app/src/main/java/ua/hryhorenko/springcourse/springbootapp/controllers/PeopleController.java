@@ -1,13 +1,14 @@
 package ua.hryhorenko.springcourse.springbootapp.controllers;
 
 import jakarta.validation.Valid;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
+import ua.hryhorenko.springcourse.springbootapp.dto.PersonDTO;
 import ua.hryhorenko.springcourse.springbootapp.models.Person;
 import ua.hryhorenko.springcourse.springbootapp.services.PeopleService;
 import ua.hryhorenko.springcourse.springbootapp.util.PersonErrorResponse;
@@ -15,29 +16,32 @@ import ua.hryhorenko.springcourse.springbootapp.util.PersonNotCreatedException;
 import ua.hryhorenko.springcourse.springbootapp.util.PersonNotFoundException;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController()
 @RequestMapping("/people")
 public class PeopleController {
   private final PeopleService peopleService;
+  private final ModelMapper modelMapper;
 
   @Autowired
-  public PeopleController(PeopleService peopleService) {
+  public PeopleController(PeopleService peopleService, ModelMapper modelMapper) {
     this.peopleService = peopleService;
+    this.modelMapper = modelMapper;
   }
 
   @GetMapping()
-  public List<Person> getPeople() {
-    return peopleService.findAll(); // Jackson конвертирует эти объекты в JSON
+  public List<PersonDTO> getPeople() {
+    return peopleService.findAll().stream().map(this::convertToPersonDTO).collect(Collectors.toList()); // Jackson конвертирует эти объекты в JSON
   }
 
   @GetMapping("/{id}")
-  public Person getPerson(@PathVariable("id") int id) {
-    return peopleService.findOne(id); // Jackson конвертирует в JSON
+  public PersonDTO getPerson(@PathVariable("id") int id) {
+    return convertToPersonDTO(peopleService.findOne(id)); // Jackson конвертирует в JSON
   }
 
   @PostMapping()
-  public ResponseEntity<HttpStatus> create(@RequestBody @Valid Person person, BindingResult bindingResult) {
+  public ResponseEntity<HttpStatus> create(@RequestBody @Valid PersonDTO personDTO, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       StringBuilder errorMsg = new StringBuilder();
       List<FieldError> errors = bindingResult.getFieldErrors();
@@ -48,9 +52,17 @@ public class PeopleController {
 
       throw new PersonNotCreatedException(errorMsg.toString());
     }
-    peopleService.save(person);
+    peopleService.save(convertToPerson(personDTO));
 
     return ResponseEntity.ok(HttpStatus.OK);
+  }
+
+  private Person convertToPerson(PersonDTO personDTO) {
+    return modelMapper.map(personDTO, Person.class);
+  }
+
+  private PersonDTO convertToPersonDTO(Person person) {
+    return modelMapper.map(person, PersonDTO.class);
   }
 
   @ExceptionHandler

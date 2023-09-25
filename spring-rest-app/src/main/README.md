@@ -1,1 +1,1 @@
-# spring-boot-app
+# spring-rest-app
